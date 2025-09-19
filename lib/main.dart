@@ -1,76 +1,63 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hooks_riverpod/legacy.dart';
 
-class CounterNotifier extends StateNotifier<int> {
-  CounterNotifier() : super(0); // initial state = 0
-  void increment() {
-    state++;
-  }
-
-  void decrement() {
-    state--;
-  }
-}
-
-class IncrementStatusNotifier extends StateNotifier<bool> {
-  IncrementStatusNotifier() : super(true);
-  void reverseStatus() {
-    state = !state;
-  }
-}
-
-final statusProvider = StateNotifierProvider<IncrementStatusNotifier, bool>(
-  (ref) => IncrementStatusNotifier(),
-);
-
-final StateNotifierProvider<CounterNotifier, int> counterProvider =
-    StateNotifierProvider<CounterNotifier, int>((ref) {
-      return CounterNotifier();
-    });
-
 void main() {
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+enum City { mosul, dhamar, paris }
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(home: CounterPage());
+typedef WeatherEmoji = String;
+
+Future<WeatherEmoji> getWeather(City city) {
+  return Future.delayed(
+    const Duration(seconds: 1),
+    () => {City.mosul: '☀', City.dhamar: '❄', City.paris: '🌫'}[city] ?? '?',
+  );
+}
+
+final String unknownWeatherEmoji = '🤷‍♂️';
+
+final cityProvider = StateProvider<City?>((ref) => null);
+
+final weatherProvider = FutureProvider<WeatherEmoji>((ref) {
+  final city = ref.watch(cityProvider);
+  if (city != null) {
+    return getWeather(city);
+  } else {
+    return unknownWeatherEmoji;
   }
-}
+});
 
-class CounterPage extends ConsumerWidget {
-  const CounterPage({super.key});
-
+class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Riverpod Bounce Counter')),
-      body: Center(
-        child: Consumer(
-          builder: (context, ref, child) {
-            final count = ref.watch(counterProvider);
-            return Text('$count', style: const TextStyle(fontSize: 48));
-          },
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: Text('Weather'), centerTitle: true),
+        body: Center(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: City.values.length,
+                  itemBuilder: (context, index) {
+                    final city = City.values[index];
+                    final isSelected = city == ref.watch(cityProvider);
+                    return ListTile(
+                      title: Text(city.toString()),
+                      trailing: isSelected ? Icon(Icons.check) : null,
+                      onTap: () {
+                        ref.read(cityProvider.notifier).state = city;
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final status = ref.read(statusProvider);
-          if (status) {
-            ref.read(counterProvider.notifier).increment();
-          } else {
-            ref.read(counterProvider.notifier).decrement();
-          }
-          final num = ref.read(counterProvider);
-          if (num >= 9 || num <= 0) {
-            ref.read(statusProvider.notifier).reverseStatus();
-          }
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }
